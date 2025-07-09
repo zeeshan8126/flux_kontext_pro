@@ -1,23 +1,17 @@
-# Use a standard RunPod image with PyTorch and CUDA
-FROM runpod/pytorch:2.2.0-py3.11-cuda12.1.1-devel-ubuntu22.04
+# Use a standard RunPod PyTorch image as the base
+FROM runpod/pytorch:2.3.1-py3.12-cuda12.1.1-devel-ubuntu22.04
 
-# Set the working directory
-WORKDIR /
-
-# Install git and other essentials
-RUN apt-get update && apt-get install -y git wget && rm -rf /var/lib/apt/lists/*
-
-# Copy your entire ComfyUI project into the container
-COPY . /app
+# Set the working directory inside the container
 WORKDIR /app
 
-# Install all Python dependencies from your requirements file
+# Install git so we can clone your repository
+RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+
+# Clone the correct repository for this endpoint
+RUN git clone https://github.com/zeeshan8126/flux_kontext_pro.git .
+
+# Install the Python dependencies from your requirements.txt file
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
-# This is where you would add commands to install custom nodes.
-# For example, to install the node from your repo (if it were separate):
-# RUN git clone https://github.com/zeeshan8126/flux_kontext_pro.git ./custom_nodes/flux_kontext_pro
-# Since your nodes are already inside the 'custom_nodes' directory, this step is covered by the main COPY command.
-
-# Set the entrypoint for the RunPod worker
-CMD ["python", "-u", "-m", "runpod.serverless"]
+# Set the entrypoint to run the handler script.
+CMD ["python", "-u", "handler.py"]
