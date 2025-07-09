@@ -47,7 +47,8 @@ def build_workflow(num_images):
         "class_type": "FluxKontextProImageNode",
         "inputs": {
             "prompt": "Default prompt",
-            "upsampling": "disable",
+            "prompt_upsampling": True,
+            "guidance": 3.0,
             "aspect_ratio": "1:1",
             "steps": 100, # Default value
             "seed": 1234,  # Default value
@@ -133,7 +134,10 @@ def handler(job):
     api_node["aspect_ratio"] = job_input.get('aspect_ratio', '1:1')
     api_node["steps"] = job_input.get('steps', 50)
     api_node["seed"] = job_input.get('seed', 1234)
-    api_node["upsampling"] = "enable" if job_input.get('guidance', 0) > 7.5 else "disable"
+    
+    guidance_value = job_input.get('guidance', 3.0)
+    api_node["guidance"] = guidance_value
+    api_node["prompt_upsampling"] = job_input.get('prompt_upsampling', True)
 
     return run_workflow(final_workflow)
 
