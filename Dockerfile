@@ -1,10 +1,12 @@
-# Use a standard RunPod PyTorch image as the base
-FROM runpod/pytorch:2.3.1-py3.12-cuda12.1.1-devel-ubuntu22.04
+# Use an official, stable PyTorch image as the base
+FROM pytorch/pytorch:2.1.0-cuda11.8-cudnn8-runtime
 
-# Set the working directory inside the container
+# Set the working directory
 WORKDIR /app
 
-# Install git so we can clone your repository
+# The official PyTorch image may not have git, so we install it.
+# We also need to set an environment variable to allow apt to work without asking questions.
+ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
 
 # Clone the correct repository for this endpoint

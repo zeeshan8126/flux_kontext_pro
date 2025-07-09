@@ -49,7 +49,7 @@ def build_workflow(num_images):
             "prompt": "Default prompt",
             "upsampling": "disable",
             "aspect_ratio": "1:1",
-            "steps": 50, # Default value
+            "steps": 100, # Default value
             "seed": 1234,  # Default value
             "image": [bfl_input_node_id, 0]
         }
