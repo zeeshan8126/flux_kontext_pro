@@ -361,6 +361,20 @@ class FluxKontextProImageNode(ComfyNodeABC):
             },
         }
 
+    @classmethod
+    def VALIDATE_INPUTS(cls, aspect_ratio: str):
+        try:
+            validate_aspect_ratio(
+                aspect_ratio,
+                minimum_ratio=cls.MINIMUM_RATIO,
+                maximum_ratio=cls.MAXIMUM_RATIO,
+                minimum_ratio_str=cls.MINIMUM_RATIO_STR,
+                maximum_ratio_str=cls.MAXIMUM_RATIO_STR,
+            )
+        except Exception as e:
+            return str(e)
+        return True
+
     RETURN_TYPES = (IO.IMAGE,)
     DESCRIPTION = cleandoc(__doc__ or "")  # Handle potential None value
     FUNCTION = "api_call"
