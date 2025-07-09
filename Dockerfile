@@ -1,3 +1,4 @@
+# Forcing a fresh build by adding this comment - v2
 # Use an official, stable PyTorch image as the base
 FROM pytorch/pytorch:2.1.0-cuda11.8-cudnn8-runtime
 
@@ -13,10 +14,7 @@ RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
 RUN git clone https://github.com/zeeshan8126/flux_kontext_pro.git .
 
 # Install the Python dependencies from your requirements.txt file
-# AND install the missing 'opencv-python' dependency for the ComfyI2I custom node.
-RUN pip install --upgrade pip && \
-    pip install -r requirements.txt && \
-    pip install opencv-python-headless
+RUN pip install --upgrade pip && pip install -r requirements.txt
 
 # Set the entrypoint to run the handler script.
 CMD ["python", "-u", "handler.py"]
