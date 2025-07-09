@@ -144,4 +144,4 @@ def handler(job):
 if __name__ == "__main__":
     server_thread = threading.Thread(target=start_comfyui_server); server_thread.daemon = True; server_thread.start()
     wait_for_server_ready()
-    runpod.serverless.start({"handler": handler}) 
+    runpod.serverless.start({"handler": handler})
