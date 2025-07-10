@@ -13,11 +13,15 @@ ENV AUTH_TOKEN_COMFY_ORG=""
 ENV API_KEY_COMFY_ORG=""
 
 # CACHE BUST: Force rebuild for ImageStitch + NumPy fixes
-ENV FIX_VERSION="imagestitch-numpy-fix-v5"
+ENV FIX_VERSION="imagestitch-numpy-fix-v6"
 RUN echo "DEPLOYING FIX VERSION: $FIX_VERSION" > /app/version.txt
 
-# Clone the fixed repository
-RUN git clone --depth 1 https://github.com/zeeshan8126/flux-kontext-pro-fixed.git . && \
+# Clone the fixed repository - clear directory first
+RUN rm -rf /app/* /app/.* 2>/dev/null || true && \
+    git clone --depth 1 https://github.com/zeeshan8126/flux-kontext-pro-fixed.git /tmp/repo && \
+    cp -r /tmp/repo/* /app/ && \
+    cp -r /tmp/repo/.* /app/ 2>/dev/null || true && \
+    rm -rf /tmp/repo && \
     echo "Clone completed at: $(date)" > /app/build_info.txt
 
 # Verify we have the ImageStitch parameters in handler.py
