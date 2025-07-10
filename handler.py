@@ -155,7 +155,13 @@ def validate_workflow(workflow):
     return True
 
 def start_comfyui_server():
-    global server_process; cmd = ["python", "main.py", "--listen", "--port", "8188"]; server_process = subprocess.Popen(cmd)
+    global server_process
+    cmd = ["python", "main.py", "--listen", "--port", "8188"]
+    # Explicitly pass environment variables to ComfyUI subprocess
+    env = os.environ.copy()
+    print(f"[COMFYUI_START] Starting ComfyUI with AUTH_TOKEN_COMFY_ORG: {'SET' if env.get('AUTH_TOKEN_COMFY_ORG') else 'NOT SET'}")
+    print(f"[COMFYUI_START] Starting ComfyUI with API_KEY_COMFY_ORG: {'SET' if env.get('API_KEY_COMFY_ORG') else 'NOT SET'}")
+    server_process = subprocess.Popen(cmd, env=env)
 
 def wait_for_server_ready():
     global comfyui_started
