@@ -15,17 +15,13 @@ ENV API_KEY_COMFY_ORG=""
 
 
 
-# CACHE BUST: Force rebuild for ImageStitch fixes
-ENV FIX_VERSION="imagestitch-fix-v7"
-RUN echo "DEPLOYING FIX VERSION: $FIX_VERSION" > /app/version.txt
+# Copy repository content to container first
+COPY . /app/
 
-# Clone the fixed repository - clear directory first
-RUN rm -rf /app/* /app/.* 2>/dev/null || true && \
-    git clone --depth 1 https://github.com/zeeshan8126/flux-kontext-pro-fixed.git /tmp/repo && \
-    cp -r /tmp/repo/* /app/ && \
-    cp -r /tmp/repo/.* /app/ 2>/dev/null || true && \
-    rm -rf /tmp/repo && \
-    echo "Clone completed at: $(date)" > /app/build_info.txt
+# CACHE BUST: Force rebuild for ImageStitch fixes
+ENV FIX_VERSION="flux-pro-v1"
+RUN echo "DEPLOYING FIX VERSION: $FIX_VERSION" > /app/version.txt && \
+    echo "Using flux-pro repository content at: $(date)" > /app/build_info.txt
 
 # Verify we have the ImageStitch parameters in handler.py
 RUN grep -q "spacing_width.*0" handler.py && \
