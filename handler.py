@@ -141,6 +141,14 @@ def handler(job):
         print("[HANDLER] ERROR: ComfyUI server is not ready")
         return {"error": "ComfyUI server is not ready."}
     
+    # Check for API authentication
+    auth_token = os.environ.get("AUTH_TOKEN_COMFY_ORG")
+    api_key = os.environ.get("API_KEY_COMFY_ORG")
+    if not auth_token or not api_key:
+        print("[HANDLER] WARNING: Missing API authentication credentials")
+        print("[HANDLER] Please set AUTH_TOKEN_COMFY_ORG and API_KEY_COMFY_ORG environment variables")
+        return {"error": "Missing API authentication credentials. Please set AUTH_TOKEN_COMFY_ORG and API_KEY_COMFY_ORG environment variables."}
+    
     job_input = job['input']; images = job_input.get('images', [])
     num_images = len(images)
     print(f"[HANDLER] Processing {num_images} images")

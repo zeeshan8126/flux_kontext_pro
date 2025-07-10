@@ -8,6 +8,11 @@ WORKDIR /app
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
 
+# Set environment variables for ComfyUI API authentication
+# These will be provided by RunPod environment variables
+ENV AUTH_TOKEN_COMFY_ORG=""
+ENV API_KEY_COMFY_ORG=""
+
 # Clone the correct repository for this endpoint
 # Force fresh clone every time - no cache
 RUN git clone --depth 1 https://github.com/zeeshan8126/flux_kontext_pro.git . && \
