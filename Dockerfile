@@ -28,5 +28,8 @@ RUN pip install --upgrade pip && \
 # Verify numpy installation
 RUN python -c "import numpy; print(f'NumPy version: {numpy.__version__}')"
 
+# Force rebuild - ImageStitch parameters fixed in handler.py
+RUN echo "ImageStitch fix deployed: $(date)" > /app/imageStitch_fix.txt
+
 # Set the entrypoint to run the handler script.
 CMD ["python", "-u", "handler.py"]
