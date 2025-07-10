@@ -9,6 +9,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
 
 # Clone the correct repository for this endpoint
+# Cache bust: 2024-12-29-fix-validation-error
 RUN git clone https://github.com/zeeshan8126/flux_kontext_pro.git .
 
 # Install Python dependencies.
