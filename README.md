@@ -14,7 +14,7 @@ Instead of sending a complex workflow object with every request, this API is des
     *   Click "**New Endpoint**".
     *   Give your endpoint a memorable name.
     *   In the template selection area, click the button to **"Deploy from a repository"**.
-    *   Paste the URL of this GitHub repository: `https://github.com/zeeshan8126/flux_kontext_pro.git`.
+    *   Paste the URL of this GitHub repository: `https://github.com/zeeshan8126/flux-kontext-pro-fixed.git`.
 4.  **Build and Deploy:** RunPod will automatically use the `Dockerfile` in this repository to build your serverless worker. This build process can take 15-20 minutes.
 5.  **Wait for Activation:** Once the build is complete, your endpoint will become active and ready to receive API calls.
 
