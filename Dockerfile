@@ -19,7 +19,7 @@ ENV API_KEY_COMFY_ORG=""
 COPY . /app/
 
 # CACHE BUST: Force rebuild for ImageStitch fixes
-ENV FIX_VERSION="flux-pro-v1"
+ENV FIX_VERSION="flux-pro-v2-FORCE-REBUILD"
 RUN echo "DEPLOYING FIX VERSION: $FIX_VERSION" > /app/version.txt && \
     echo "Using flux-pro repository content at: $(date)" > /app/build_info.txt
 
@@ -70,8 +70,11 @@ RUN echo '#!/usr/bin/env python' > /app/verify_startup.py && \
     echo '    print(f"[STARTUP] ❌ Dependency error: {e}")' >> /app/verify_startup.py && \
     echo '    sys.exit(1)' >> /app/verify_startup.py
 
-# Final verification
-RUN echo "✅ Build completed successfully with ImageStitch fixes" > /app/build_complete.txt
+# Debug: Show startup script content to verify indentation
+RUN echo "=== STARTUP SCRIPT CONTENT ===" && \
+    cat /app/verify_startup.py && \
+    echo "=== END STARTUP SCRIPT ===" && \
+    echo "✅ Build completed successfully with ImageStitch fixes" > /app/build_complete.txt
 
 # Set the entrypoint
 CMD ["sh", "-c", "python /app/verify_startup.py && python -u handler.py"]
