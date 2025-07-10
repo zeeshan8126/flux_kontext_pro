@@ -9,8 +9,9 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
 
 # Clone the correct repository for this endpoint
-# Cache bust: 2024-12-29-fix-validation-error
-RUN git clone https://github.com/zeeshan8126/flux_kontext_pro.git .
+# Force fresh clone every time - no cache
+RUN git clone --depth 1 https://github.com/zeeshan8126/flux_kontext_pro.git . && \
+    echo "Build timestamp: $(date)" > /app/build_info.txt
 
 # Install Python dependencies.
 # This now includes pinning NumPy to a version less than 2.0 to solve the conflict.
