@@ -46,24 +46,9 @@ RUN echo "Pip cache bust: $PIP_CACHE_BUST" && \
     pip install --no-cache-dir --force-reinstall -r requirements.txt
 
 # TRIPLE CHECK: Verify numpy is available in the exact way ComfyUI uses it
-RUN python -c "
-import sys
-print('Python path:', sys.path)
-try:
-    import numpy as np
-    print(f'✅ NumPy version: {np.__version__}')
-    print(f'✅ NumPy location: {np.__file__}')
-    
-    # Test the exact operation that fails in LoadImage
-    import torch
-    test_array = np.array([[1, 2, 3], [4, 5, 6]])
-    test_tensor = torch.from_numpy(test_array)
-    print(f'✅ torch.from_numpy() test passed: {test_tensor.shape}')
-    print('✅ ALL NUMPY TESTS PASSED')
-except Exception as e:
-    print(f'❌ NUMPY TEST FAILED: {e}')
-    sys.exit(1)
-"
+RUN python -c "import sys; print('Python path:', sys.path)" && \
+    python -c "import numpy as np; print(f'✅ NumPy version: {np.__version__}'); print(f'✅ NumPy location: {np.__file__}')" && \
+    python -c "import torch, numpy as np; test_array = np.array([[1, 2, 3], [4, 5, 6]]); test_tensor = torch.from_numpy(test_array); print(f'✅ torch.from_numpy() test passed: {test_tensor.shape}'); print('✅ ALL NUMPY TESTS PASSED')"
 
 # Final verification: Check that handler.py contains ImageStitch fix
 RUN echo "VERIFICATION: Checking ImageStitch parameters in handler.py..." && \
