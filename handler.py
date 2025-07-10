@@ -236,6 +236,10 @@ def run_workflow(workflow):
     auth_token = os.environ.get("AUTH_TOKEN_COMFY_ORG")
     api_key = os.environ.get("API_KEY_COMFY_ORG")
     
+    # DEBUG: Print authentication status for troubleshooting
+    print(f"[AUTH_DEBUG] AUTH_TOKEN_COMFY_ORG: {'SET (' + auth_token[:20] + '...)' if auth_token else 'NOT SET OR EMPTY'}")
+    print(f"[AUTH_DEBUG] API_KEY_COMFY_ORG: {'SET (' + api_key[:20] + '...)' if api_key else 'NOT SET OR EMPTY'}")
+    
     if auth_token:
         extra_data["auth_token_comfy_org"] = auth_token
     if api_key:
