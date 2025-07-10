@@ -4,7 +4,7 @@ FROM pytorch/pytorch:2.1.0-cuda11.8-cudnn8-runtime
 # Set the working directory
 WORKDIR /app
 
-# Install git.
+# Install git and system dependencies
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
 
@@ -18,12 +18,15 @@ ENV API_KEY_COMFY_ORG=""
 RUN git clone --depth 1 https://github.com/zeeshan8126/flux_kontext_pro.git . && \
     echo "Build timestamp: $(date)" > /app/build_info.txt
 
-# Install Python dependencies.
-# This now includes pinning NumPy to a version less than 2.0 to solve the conflict.
+# Install Python dependencies with proper numpy handling
+# Install numpy first with compatible version, then other requirements
 RUN pip install --upgrade pip && \
-    pip install "numpy<2.0" && \
-    pip install -r requirements.txt && \
-    pip install opencv-python-headless
+    pip install "numpy>=1.25.0,<2.0" && \
+    pip install opencv-python-headless && \
+    pip install -r requirements.txt
+
+# Verify numpy installation
+RUN python -c "import numpy; print(f'NumPy version: {numpy.__version__}')"
 
 # Set the entrypoint to run the handler script.
 CMD ["python", "-u", "handler.py"]

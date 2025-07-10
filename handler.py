@@ -9,6 +9,14 @@ import os
 import base64
 import copy
 
+# Verify critical dependencies at startup
+try:
+    import numpy as np
+    print(f"[STARTUP] NumPy version: {np.__version__}")
+except ImportError as e:
+    print(f"[STARTUP] CRITICAL ERROR: NumPy not available: {e}")
+    raise
+
 # ---------------------------------- Globals --------------------------------- #
 server_process = None
 SERVER_ADDRESS = "127.0.0.1:8188"
@@ -30,7 +38,14 @@ def build_workflow(num_images):
         last_stitch_node_id = stitch_node_id
         workflow[stitch_node_id] = {
             "class_type": "ImageStitch",
-            "inputs": {"image1": [load_node_ids[0], 0], "image2": [load_node_ids[1], 0]}
+            "inputs": {
+                "image1": [load_node_ids[0], 0], 
+                "image2": [load_node_ids[1], 0],
+                "direction": "right",
+                "match_image_size": True,
+                "spacing_width": 0,
+                "spacing_color": "white"
+            }
         }
         for i in range(2, num_images):
             prev_stitch_node_id = last_stitch_node_id
@@ -38,7 +53,14 @@ def build_workflow(num_images):
             last_stitch_node_id = stitch_node_id
             workflow[stitch_node_id] = {
                 "class_type": "ImageStitch",
-                "inputs": {"image1": [prev_stitch_node_id, 0], "image2": [load_node_ids[i], 0]}
+                "inputs": {
+                    "image1": [prev_stitch_node_id, 0], 
+                    "image2": [load_node_ids[i], 0],
+                    "direction": "right",
+                    "match_image_size": True,
+                    "spacing_width": 0,
+                    "spacing_color": "white"
+                }
             }
     
     bfl_input_node_id = load_node_ids[0] if num_images == 1 else last_stitch_node_id
@@ -74,7 +96,7 @@ def wait_for_server_ready():
         if not comfyui_started: time.sleep(1)
 
 def prepare_inputs(images):
-    input_dir = "/app/input"; os.makedirs(input_dir, exist_ok=True)
+    input_dir = "input"; os.makedirs(input_dir, exist_ok=True)
     for image_data in images:
         name, b64_img = image_data.get("name"), image_data.get("image")
         if not name or not b64_img: continue
@@ -85,7 +107,7 @@ def prepare_inputs(images):
 
 def get_image_data(filename, subfolder, image_type):
     """Reads an image file and returns its Base64 encoded data."""
-    filepath = os.path.join("/app", image_type, subfolder, filename)
+    filepath = os.path.join(image_type, subfolder, filename)
     try:
         with open(filepath, 'rb') as f:
             encoded_string = base64.b64encode(f.read()).decode('utf-8')
@@ -94,7 +116,21 @@ def get_image_data(filename, subfolder, image_type):
         return None
 
 def run_workflow(workflow):
-    prompt_data = json.dumps({"prompt": workflow, "client_id": str(uuid.uuid4())}).encode('utf-8')
+    # Include authentication credentials in extra_data for API nodes
+    extra_data = {}
+    auth_token = os.environ.get("AUTH_TOKEN_COMFY_ORG")
+    api_key = os.environ.get("API_KEY_COMFY_ORG")
+    
+    if auth_token:
+        extra_data["auth_token_comfy_org"] = auth_token
+    if api_key:
+        extra_data["api_key_comfy_org"] = api_key
+    
+    prompt_payload = {"prompt": workflow, "client_id": str(uuid.uuid4())}
+    if extra_data:
+        prompt_payload["extra_data"] = extra_data
+    
+    prompt_data = json.dumps(prompt_payload).encode('utf-8')
     try:
         req = requests.post(f"http://{SERVER_ADDRESS}/prompt", data=prompt_data); req.raise_for_status()
         prompt_id = req.json()['prompt_id']
@@ -141,13 +177,8 @@ def handler(job):
         print("[HANDLER] ERROR: ComfyUI server is not ready")
         return {"error": "ComfyUI server is not ready."}
     
-    # Check for API authentication
-    auth_token = os.environ.get("AUTH_TOKEN_COMFY_ORG")
-    api_key = os.environ.get("API_KEY_COMFY_ORG")
-    if not auth_token or not api_key:
-        print("[HANDLER] WARNING: Missing API authentication credentials")
-        print("[HANDLER] Please set AUTH_TOKEN_COMFY_ORG and API_KEY_COMFY_ORG environment variables")
-        return {"error": "Missing API authentication credentials. Please set AUTH_TOKEN_COMFY_ORG and API_KEY_COMFY_ORG environment variables."}
+    # Note: Authentication credentials are now handled by ComfyUI system via extra_data
+    # The credentials will be checked when the API node executes
     
     job_input = job['input']; images = job_input.get('images', [])
     num_images = len(images)
