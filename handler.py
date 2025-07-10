@@ -98,32 +98,61 @@ def run_workflow(workflow):
     try:
         req = requests.post(f"http://{SERVER_ADDRESS}/prompt", data=prompt_data); req.raise_for_status()
         prompt_id = req.json()['prompt_id']
+        
+        # Add timeout to prevent infinite loops
+        max_wait_time = 300  # 5 minutes timeout
+        start_time = time.time()
+        
         while True:
+            # Check for timeout
+            if time.time() - start_time > max_wait_time:
+                return {"error": "Workflow execution timed out after 5 minutes"}
+            
             res = requests.get(f"http://{SERVER_ADDRESS}/history/{prompt_id}")
             if res.status_code == 200:
                 history = res.json()
-                if prompt_id in history and history[prompt_id].get('outputs'):
-                    outputs = history[prompt_id]['outputs']
-                    images_output = []
-                    for node in outputs.values():
-                        for img in node.get('images', []):
-                            img_data = get_image_data(img['filename'], img['subfolder'], img['type'])
-                            if img_data:
-                                images_output.append({"filename": img['filename'], "data": img_data})
-                    return {"images": images_output}
+                if prompt_id in history:
+                    prompt_history = history[prompt_id]
+                    
+                    # Check if workflow failed
+                    if prompt_history.get('status', {}).get('status_str') == 'error':
+                        error_details = prompt_history.get('status', {}).get('messages', [])
+                        return {"error": f"Workflow failed: {error_details}"}
+                    
+                    # Check if workflow completed successfully
+                    if prompt_history.get('outputs'):
+                        outputs = prompt_history['outputs']
+                        images_output = []
+                        for node in outputs.values():
+                            for img in node.get('images', []):
+                                img_data = get_image_data(img['filename'], img['subfolder'], img['type'])
+                                if img_data:
+                                    images_output.append({"filename": img['filename'], "data": img_data})
+                        return {"images": images_output}
+            
             time.sleep(0.5)
-    except Exception as e: return {"error": f"Workflow execution failed: {e}"}
+    except Exception as e: 
+        return {"error": f"Workflow execution failed: {e}"}
 
 # --------------------------------- RunPod Handler --------------------------------- #
 def handler(job):
-    if not comfyui_started: return {"error": "ComfyUI server is not ready."}
+    print(f"[HANDLER] Starting job processing...")
+    if not comfyui_started: 
+        print("[HANDLER] ERROR: ComfyUI server is not ready")
+        return {"error": "ComfyUI server is not ready."}
     
     job_input = job['input']; images = job_input.get('images', [])
     num_images = len(images)
+    print(f"[HANDLER] Processing {num_images} images")
+    
     if not (1 <= num_images <= 5): # Now allows 1 to 5 images
+        print(f"[HANDLER] ERROR: Invalid number of images: {num_images}")
         return {"error": f"This endpoint requires 1 to 5 images, but {num_images} were provided."}
 
+    print("[HANDLER] Preparing input images...")
     prepare_inputs(images)
+    
+    print("[HANDLER] Building workflow...")
     final_workflow = build_workflow(num_images)
 
     for i in range(num_images):
@@ -139,6 +168,14 @@ def handler(job):
     api_node["guidance"] = guidance_value
     api_node["prompt_upsampling"] = job_input.get('prompt_upsampling', False)
 
+    print(f"[HANDLER] Final workflow parameters:")
+    print(f"  - Prompt: {api_node['prompt']}")
+    print(f"  - Aspect ratio: {api_node['aspect_ratio']}")
+    print(f"  - Guidance: {api_node['guidance']}")
+    print(f"  - Steps: {api_node['steps']}")
+    print(f"  - Prompt upsampling: {api_node['prompt_upsampling']}")
+    
+    print("[HANDLER] Executing workflow...")
     return run_workflow(final_workflow)
 
 if __name__ == "__main__":
