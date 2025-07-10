@@ -17,6 +17,31 @@ except ImportError as e:
     print(f"[STARTUP] CRITICAL ERROR: NumPy not available: {e}")
     raise
 
+# Debug all environment variables at startup
+print(f"[STARTUP] Environment variable debugging:")
+print(f"[STARTUP] Total environment variables: {len(os.environ)}")
+auth_vars = [(k, v[:50] + '...' if len(v) > 50 else v) for k, v in os.environ.items() 
+             if any(term in k.upper() for term in ['AUTH', 'TOKEN', 'API', 'KEY', 'COMFY', 'BFL'])]
+if auth_vars:
+    print(f"[STARTUP] Auth-related environment variables:")
+    for k, v in auth_vars:
+        print(f"[STARTUP]   {k}: {v}")
+else:
+    print(f"[STARTUP] No auth-related environment variables found")
+
+# Check for common environment variable variations
+possible_auth_vars = [
+    'AUTH_TOKEN_COMFY_ORG', 'API_KEY_COMFY_ORG', 'COMFY_API_TOKEN', 'COMFY_API_KEY',
+    'BFL_API_KEY', 'BLACKFORESTLABS_API_KEY', 'TOKEN_COMFY_ORG', 'KEY_COMFY_ORG'
+]
+print(f"[STARTUP] Checking for expected auth variables:")
+for var in possible_auth_vars:
+    value = os.environ.get(var)
+    if value:
+        print(f"[STARTUP]   {var}: SET ({value[:20]}...)")
+    else:
+        print(f"[STARTUP]   {var}: NOT SET")
+
 # ---------------------------------- Globals --------------------------------- #
 server_process = None
 SERVER_ADDRESS = "127.0.0.1:8188"
@@ -156,12 +181,69 @@ def validate_workflow(workflow):
 
 def start_comfyui_server():
     global server_process
-    cmd = ["python", "main.py", "--listen", "--port", "8188"]
-    # Explicitly pass environment variables to ComfyUI subprocess
+    
+    # Create a verification script to check environment variables in the subprocess
+    verify_script = """
+import os
+import sys
+
+print(f"[SUBPROCESS_VERIFY] Python executable: {sys.executable}")
+print(f"[SUBPROCESS_VERIFY] Working directory: {os.getcwd()}")
+print(f"[SUBPROCESS_VERIFY] Total environment variables: {len(os.environ)}")
+
+# Check for auth-related environment variables
+auth_vars = [(k, v[:50] + '...' if len(v) > 50 else v) for k, v in os.environ.items() 
+             if any(term in k.upper() for term in ['AUTH', 'TOKEN', 'API', 'KEY', 'COMFY', 'BFL'])]
+if auth_vars:
+    print(f"[SUBPROCESS_VERIFY] Auth-related environment variables in subprocess:")
+    for k, v in auth_vars:
+        print(f"[SUBPROCESS_VERIFY]   {k}: {v}")
+else:
+    print(f"[SUBPROCESS_VERIFY] No auth-related environment variables found in subprocess")
+
+# Check specific variables
+possible_auth_vars = [
+    'AUTH_TOKEN_COMFY_ORG', 'API_KEY_COMFY_ORG', 'COMFY_API_TOKEN', 'COMFY_API_KEY',
+    'BFL_API_KEY', 'BLACKFORESTLABS_API_KEY', 'TOKEN_COMFY_ORG', 'KEY_COMFY_ORG'
+]
+print(f"[SUBPROCESS_VERIFY] Checking for expected auth variables in subprocess:")
+for var in possible_auth_vars:
+    value = os.environ.get(var)
+    if value:
+        print(f"[SUBPROCESS_VERIFY]   {var}: SET ({value[:20]}...)")
+    else:
+        print(f"[SUBPROCESS_VERIFY]   {var}: NOT SET")
+"""
+    
+    # Write verification script
+    with open("verify_env.py", "w") as f:
+        f.write(verify_script)
+    
+    # Prepare environment variables
     env = os.environ.copy()
-    print(f"[COMFYUI_START] Starting ComfyUI with AUTH_TOKEN_COMFY_ORG: {'SET' if env.get('AUTH_TOKEN_COMFY_ORG') else 'NOT SET'}")
-    print(f"[COMFYUI_START] Starting ComfyUI with API_KEY_COMFY_ORG: {'SET' if env.get('API_KEY_COMFY_ORG') else 'NOT SET'}")
+    
+    # Log what we're passing to the subprocess
+    print(f"[COMFYUI_START] Starting ComfyUI subprocess...")
+    auth_token = env.get('AUTH_TOKEN_COMFY_ORG') or env.get('API_KEY_COMFY_ORG')
+    print(f"[COMFYUI_START] Found auth token: {'SET (' + auth_token[:20] + '...)' if auth_token else 'NOT SET'}")
+    
+    # Ensure the token is available under the standard name for comfy_api_nodes
+    if auth_token:
+        env['API_KEY_COMFY_ORG'] = auth_token  # This is what our handler will look for
+        print(f"[COMFYUI_START] Set API_KEY_COMFY_ORG in subprocess environment")
+    
+    # First run verification script
+    print(f"[COMFYUI_START] Running environment verification in subprocess...")
+    verify_process = subprocess.run(["python", "verify_env.py"], env=env, capture_output=True, text=True)
+    print(f"[COMFYUI_START] Verification output:\n{verify_process.stdout}")
+    if verify_process.stderr:
+        print(f"[COMFYUI_START] Verification errors:\n{verify_process.stderr}")
+    
+    # Start ComfyUI
+    cmd = ["python", "main.py", "--listen", "--port", "8188"]
+    print(f"[COMFYUI_START] Starting ComfyUI with command: {' '.join(cmd)}")
     server_process = subprocess.Popen(cmd, env=env)
+    print(f"[COMFYUI_START] ComfyUI process started with PID: {server_process.pid}")
 
 def wait_for_server_ready():
     global comfyui_started
@@ -237,35 +319,72 @@ def run_workflow(workflow):
     if not validate_workflow(workflow):
         return {"error": "Workflow validation failed - check logs for details"}
     
-    # Include authentication credentials in extra_data for API nodes
-    extra_data = {}
+    # Comprehensive authentication debugging
     auth_token = os.environ.get("AUTH_TOKEN_COMFY_ORG")
     api_key = os.environ.get("API_KEY_COMFY_ORG")
     
-    # DEBUG: Print authentication status for troubleshooting
+    print(f"[AUTH_DEBUG] === COMPREHENSIVE AUTH DEBUGGING ===")
     print(f"[AUTH_DEBUG] AUTH_TOKEN_COMFY_ORG: {'SET (' + auth_token[:20] + '...)' if auth_token else 'NOT SET OR EMPTY'}")
     print(f"[AUTH_DEBUG] API_KEY_COMFY_ORG: {'SET (' + api_key[:20] + '...)' if api_key else 'NOT SET OR EMPTY'}")
-    print(f"[AUTH_DEBUG] All environment variables: {list(os.environ.keys())}")
-    print(f"[AUTH_DEBUG] Comfy-related env vars: {[(k, v[:20] + '...' if len(v) > 20 else v) for k, v in os.environ.items() if 'COMFY' in k.upper()]}")
+    
+    # Check all possible auth variable names
+    possible_auth_vars = [
+        'AUTH_TOKEN_COMFY_ORG', 'API_KEY_COMFY_ORG', 'COMFY_API_TOKEN', 'COMFY_API_KEY',
+        'BFL_API_KEY', 'BLACKFORESTLABS_API_KEY', 'TOKEN_COMFY_ORG', 'KEY_COMFY_ORG'
+    ]
+    print(f"[AUTH_DEBUG] All possible auth variables:")
+    for var in possible_auth_vars:
+        value = os.environ.get(var)
+        if value:
+            print(f"[AUTH_DEBUG]   {var}: SET ({value[:20]}...)")
+        else:
+            print(f"[AUTH_DEBUG]   {var}: NOT SET")
+    
+    # List all environment variables that contain relevant keywords
+    all_auth_vars = [(k, v[:50] + '...' if len(v) > 50 else v) for k, v in os.environ.items() 
+                     if any(term in k.upper() for term in ['AUTH', 'TOKEN', 'API', 'KEY', 'COMFY', 'BFL'])]
+    print(f"[AUTH_DEBUG] All auth-related environment variables:")
+    for k, v in all_auth_vars:
+        print(f"[AUTH_DEBUG]   {k}: {v}")
+    
+    # Include authentication credentials in extra_data for API nodes
+    extra_data = {}
+    
+    # The comfy_api_nodes system expects "api_key_comfy_org" in extra_data
+    # Try both possible environment variable names that RunPod might provide
+    auth_token = auth_token or os.environ.get("API_KEY_COMFY_ORG") or os.environ.get("COMFY_API_KEY")
     
     if auth_token:
-        extra_data["auth_token_comfy_org"] = auth_token
-    if api_key:
-        extra_data["api_key_comfy_org"] = api_key
+        # This is the correct key name according to comfy_api_nodes documentation
+        extra_data["api_key_comfy_org"] = auth_token
+        print(f"[AUTH_DEBUG] Set api_key_comfy_org in extra_data")
+    else:
+        print(f"[AUTH_DEBUG] ERROR: No authentication token found!")
+        print(f"[AUTH_DEBUG] RunPod should set AUTH_TOKEN_COMFY_ORG or API_KEY_COMFY_ORG")
+        print(f"[AUTH_DEBUG] Available environment variables:")
+        for key in sorted(os.environ.keys()):
+            if any(term in key.upper() for term in ['AUTH', 'TOKEN', 'API', 'KEY', 'COMFY']):
+                value = os.environ[key]
+                print(f"[AUTH_DEBUG]   {key}: {value[:30]}..." if len(value) > 30 else f"[AUTH_DEBUG]   {key}: {value}")
+    
+    print(f"[AUTH_DEBUG] Final extra_data keys: {list(extra_data.keys())}")
+    if extra_data:
+        print(f"[AUTH_DEBUG] api_key_comfy_org length: {len(extra_data.get('api_key_comfy_org', ''))}")
     
     prompt_payload = {"prompt": workflow, "client_id": str(uuid.uuid4())}
     if extra_data:
         prompt_payload["extra_data"] = extra_data
     
     # Debug: Print the workflow being sent
-    print(f"[DEBUG] Sending workflow to ComfyUI:")
-    print(f"[DEBUG] Workflow structure: {json.dumps(workflow, indent=2)}")
-    print(f"[DEBUG] Extra data: {extra_data}")
+    print(f"[WORKFLOW_DEBUG] Sending workflow to ComfyUI:")
+    print(f"[WORKFLOW_DEBUG] Workflow has {len(workflow)} nodes")
+    print(f"[WORKFLOW_DEBUG] Extra data keys: {list(extra_data.keys())}")
     
     prompt_data = json.dumps(prompt_payload).encode('utf-8')
     try:
         # Send request with proper Content-Type header
         headers = {'Content-Type': 'application/json'}
+        print(f"[WORKFLOW_DEBUG] Sending POST request to http://{SERVER_ADDRESS}/prompt")
         req = requests.post(f"http://{SERVER_ADDRESS}/prompt", data=prompt_data, headers=headers)
         
         # Debug: Print response details for 400 errors
@@ -281,6 +400,7 @@ def run_workflow(workflow):
         
         req.raise_for_status()
         prompt_id = req.json()['prompt_id']
+        print(f"[WORKFLOW_DEBUG] Got prompt_id: {prompt_id}")
         
         # Add timeout to prevent infinite loops
         max_wait_time = 300  # 5 minutes timeout
@@ -300,6 +420,7 @@ def run_workflow(workflow):
                     # Check if workflow failed
                     if prompt_history.get('status', {}).get('status_str') == 'error':
                         error_details = prompt_history.get('status', {}).get('messages', [])
+                        print(f"[ERROR] Workflow failed with error: {error_details}")
                         return {"error": f"Workflow failed: {error_details}"}
                     
                     # Check if workflow completed successfully
