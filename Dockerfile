@@ -31,10 +31,12 @@ RUN grep -q "spacing_width.*0" handler.py && \
     grep -q "spacing_color.*white" handler.py && \
     echo "✅ ImageStitch parameters verified in handler.py"
 
-# Install Python dependencies without NumPy conflicts
+# Install Python dependencies with proper NumPy version for PyTorch 2.1.0 compatibility
 RUN pip install --upgrade pip && \
+    pip uninstall -y numpy && \
     pip install opencv-python-headless && \
-    pip install -r requirements.txt
+    pip install -r requirements.txt && \
+    pip install "numpy<2.0.0"
 
 # Simple verification that basic imports work
 RUN python -c "print('✅ Build verification complete')"
@@ -46,6 +48,11 @@ RUN echo '#!/usr/bin/env python' > /app/verify_startup.py && \
     echo '    import numpy as np' >> /app/verify_startup.py && \
     echo '    import torch' >> /app/verify_startup.py && \
     echo '    print(f"[STARTUP] ✅ NumPy {np.__version__} ready")' >> /app/verify_startup.py && \
+    echo '    print(f"[STARTUP] ✅ PyTorch {torch.__version__} ready")' >> /app/verify_startup.py && \
+    echo '    # Test NumPy-PyTorch compatibility' >> /app/verify_startup.py && \
+    echo '    test_array = np.array([1.0, 2.0, 3.0], dtype=np.float32)' >> /app/verify_startup.py && \
+    echo '    test_tensor = torch.from_numpy(test_array)' >> /app/verify_startup.py && \
+    echo '    print("[STARTUP] ✅ NumPy-PyTorch compatibility verified")' >> /app/verify_startup.py && \
     echo '    print("[STARTUP] ✅ All dependencies verified")' >> /app/verify_startup.py && \
     echo 'except Exception as e:' >> /app/verify_startup.py && \
     echo '    print(f"[STARTUP] ❌ Dependency error: {e}")' >> /app/verify_startup.py && \

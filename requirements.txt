@@ -1,4 +1,5 @@
-# Note: numpy is installed separately in Dockerfile to avoid version conflicts
+# Note: numpy is pinned to 1.x for compatibility with PyTorch 2.1.0
+numpy<2.0.0
 comfyui-frontend-package==1.23.4
 comfyui-workflow-templates==0.1.35
 comfyui-embedded-docs==0.2.4
