@@ -9,8 +9,11 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
 
 # Set environment variables for ComfyUI API authentication
+# These will be overridden by RunPod environment variables
 ENV AUTH_TOKEN_COMFY_ORG=""
 ENV API_KEY_COMFY_ORG=""
+
+
 
 # CACHE BUST: Force rebuild for ImageStitch fixes
 ENV FIX_VERSION="imagestitch-fix-v7"
@@ -44,6 +47,7 @@ RUN python -c "print('✅ Build verification complete')"
 # Create startup verification script  
 RUN echo '#!/usr/bin/env python' > /app/verify_startup.py && \
     echo 'import sys' >> /app/verify_startup.py && \
+    echo 'import os' >> /app/verify_startup.py && \
     echo 'try:' >> /app/verify_startup.py && \
     echo '    import numpy as np' >> /app/verify_startup.py && \
     echo '    import torch' >> /app/verify_startup.py && \
@@ -53,6 +57,18 @@ RUN echo '#!/usr/bin/env python' > /app/verify_startup.py && \
     echo '    test_array = np.array([1.0, 2.0, 3.0], dtype=np.float32)' >> /app/verify_startup.py && \
     echo '    test_tensor = torch.from_numpy(test_array)' >> /app/verify_startup.py && \
     echo '    print("[STARTUP] ✅ NumPy-PyTorch compatibility verified")' >> /app/verify_startup.py && \
+    echo '    # Check API credentials' >> /app/verify_startup.py && \
+    echo '    auth_token = os.getenv("AUTH_TOKEN_COMFY_ORG", "")' >> /app/verify_startup.py && \
+    echo '    api_key = os.getenv("API_KEY_COMFY_ORG", "")' >> /app/verify_startup.py && \
+    echo '    print(f"[STARTUP] AUTH_TOKEN_COMFY_ORG: {auth_token[:20]}..." if auth_token else "[STARTUP] AUTH_TOKEN_COMFY_ORG: (empty)")' >> /app/verify_startup.py && \
+    echo '    print(f"[STARTUP] API_KEY_COMFY_ORG: {api_key[:20]}..." if api_key else "[STARTUP] API_KEY_COMFY_ORG: (empty)")' >> /app/verify_startup.py && \
+    echo '    if not auth_token or not api_key:' >> /app/verify_startup.py && \
+    echo '        print("[STARTUP] ⚠️  WARNING: API credentials not set!")' >> /app/verify_startup.py && \
+    echo '        print("[STARTUP] Set AUTH_TOKEN_COMFY_ORG and API_KEY_COMFY_ORG in RunPod environment variables")' >> /app/verify_startup.py && \
+    echo '    elif auth_token == "your_actual_token_here" or api_key == "your_actual_api_key_here":' >> /app/verify_startup.py && \
+    echo '        print("[STARTUP] ⚠️  WARNING: Using placeholder values! Set real API tokens!")' >> /app/verify_startup.py && \
+    echo '    else:' >> /app/verify_startup.py && \
+    echo '        print("[STARTUP] ✅ API credentials configured")' >> /app/verify_startup.py && \
     echo '    print("[STARTUP] ✅ All dependencies verified")' >> /app/verify_startup.py && \
     echo 'except Exception as e:' >> /app/verify_startup.py && \
     echo '    print(f"[STARTUP] ❌ Dependency error: {e}")' >> /app/verify_startup.py && \
