@@ -47,12 +47,12 @@ def build_workflow(num_images):
         "class_type": "FluxKontextProImageNode",
         "inputs": {
             "prompt": "Default prompt",
-            "prompt_upsampling": True,
+            "prompt_upsampling": False,
             "guidance": 3.0,
-            "aspect_ratio": "1:1",
-            "steps": 100, # Default value
+            "aspect_ratio": "16:9",
+            "steps": 50, # Default value
             "seed": 1234,  # Default value
-            "image": [bfl_input_node_id, 0]
+            "input_image": [bfl_input_node_id, 0]
         }
     }
     workflow["30"] = bfl_node
@@ -131,13 +131,13 @@ def handler(job):
 
     api_node = final_workflow["30"]["inputs"]
     api_node["prompt"] = job_input.get('prompt', "Default prompt")
-    api_node["aspect_ratio"] = job_input.get('aspect_ratio', '1:1')
+    api_node["aspect_ratio"] = job_input.get('aspect_ratio', '16:9')
     api_node["steps"] = job_input.get('steps', 50)
     api_node["seed"] = job_input.get('seed', 1234)
     
     guidance_value = job_input.get('guidance', 3.0)
     api_node["guidance"] = guidance_value
-    api_node["prompt_upsampling"] = job_input.get('prompt_upsampling', True)
+    api_node["prompt_upsampling"] = job_input.get('prompt_upsampling', False)
 
     return run_workflow(final_workflow)
 
