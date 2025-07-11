@@ -224,12 +224,19 @@ for var in possible_auth_vars:
     
     # Log what we're passing to the subprocess
     print(f"[COMFYUI_START] Starting ComfyUI subprocess...")
-    auth_token = env.get('AUTH_TOKEN_COMFY_ORG') or env.get('API_KEY_COMFY_ORG')
-    print(f"[COMFYUI_START] Found auth token: {'SET (' + auth_token[:20] + '...)' if auth_token else 'NOT SET'}")
+    auth_token = env.get('AUTH_TOKEN_COMFY_ORG')
+    api_key = env.get('API_KEY_COMFY_ORG')
+    print(f"[COMFYUI_START] AUTH_TOKEN_COMFY_ORG: {'SET (' + auth_token[:20] + '...)' if auth_token else 'NOT SET'}")
+    print(f"[COMFYUI_START] API_KEY_COMFY_ORG: {'SET (' + api_key[:20] + '...)' if api_key else 'NOT SET'}")
     
-    # Ensure the token is available under the standard name for comfy_api_nodes
+    # Ensure both are available in the subprocess environment
+    # The BFL nodes read these directly from environment variables
     if auth_token:
-        env['API_KEY_COMFY_ORG'] = auth_token  # This is what our handler will look for
+        env['AUTH_TOKEN_COMFY_ORG'] = auth_token
+        print(f"[COMFYUI_START] Set AUTH_TOKEN_COMFY_ORG in subprocess environment")
+    
+    if api_key:
+        env['API_KEY_COMFY_ORG'] = api_key  
         print(f"[COMFYUI_START] Set API_KEY_COMFY_ORG in subprocess environment")
     
     # First run verification script
@@ -320,47 +327,30 @@ def run_workflow(workflow):
         return {"error": "Workflow validation failed - check logs for details"}
     
     # Comprehensive authentication debugging
+    extra_data = {}
+    
+    # Get both possible authentication tokens from environment
     auth_token = os.environ.get("AUTH_TOKEN_COMFY_ORG")
-    api_key = os.environ.get("API_KEY_COMFY_ORG")
+    api_key = os.environ.get("API_KEY_COMFY_ORG") 
     
     print(f"[AUTH_DEBUG] === COMPREHENSIVE AUTH DEBUGGING ===")
     print(f"[AUTH_DEBUG] AUTH_TOKEN_COMFY_ORG: {'SET (' + auth_token[:20] + '...)' if auth_token else 'NOT SET OR EMPTY'}")
     print(f"[AUTH_DEBUG] API_KEY_COMFY_ORG: {'SET (' + api_key[:20] + '...)' if api_key else 'NOT SET OR EMPTY'}")
     
-    # Check all possible auth variable names
-    possible_auth_vars = [
-        'AUTH_TOKEN_COMFY_ORG', 'API_KEY_COMFY_ORG', 'COMFY_API_TOKEN', 'COMFY_API_KEY',
-        'BFL_API_KEY', 'BLACKFORESTLABS_API_KEY', 'TOKEN_COMFY_ORG', 'KEY_COMFY_ORG'
-    ]
-    print(f"[AUTH_DEBUG] All possible auth variables:")
-    for var in possible_auth_vars:
-        value = os.environ.get(var)
-        if value:
-            print(f"[AUTH_DEBUG]   {var}: SET ({value[:20]}...)")
-        else:
-            print(f"[AUTH_DEBUG]   {var}: NOT SET")
-    
-    # List all environment variables that contain relevant keywords
-    all_auth_vars = [(k, v[:50] + '...' if len(v) > 50 else v) for k, v in os.environ.items() 
-                     if any(term in k.upper() for term in ['AUTH', 'TOKEN', 'API', 'KEY', 'COMFY', 'BFL'])]
-    print(f"[AUTH_DEBUG] All auth-related environment variables:")
-    for k, v in all_auth_vars:
-        print(f"[AUTH_DEBUG]   {k}: {v}")
-    
-    # Include authentication credentials in extra_data for API nodes
-    extra_data = {}
-    
-    # The comfy_api_nodes system expects "api_key_comfy_org" in extra_data
-    # Try both possible environment variable names that RunPod might provide
-    auth_token = auth_token or os.environ.get("API_KEY_COMFY_ORG") or os.environ.get("COMFY_API_KEY")
-    
+    # The comfy_api_nodes system expects both "auth_token_comfy_org" and "api_key_comfy_org" in extra_data
+    # These get mapped to the node's auth_token and comfy_api_key parameters respectively
     if auth_token:
-        # This is the correct key name according to comfy_api_nodes documentation
-        extra_data["api_key_comfy_org"] = auth_token
+        extra_data["auth_token_comfy_org"] = auth_token
+        print(f"[AUTH_DEBUG] Set auth_token_comfy_org in extra_data")
+    
+    if api_key:
+        extra_data["api_key_comfy_org"] = api_key  
         print(f"[AUTH_DEBUG] Set api_key_comfy_org in extra_data")
-    else:
-        print(f"[AUTH_DEBUG] ERROR: No authentication token found!")
-        print(f"[AUTH_DEBUG] RunPod should set AUTH_TOKEN_COMFY_ORG or API_KEY_COMFY_ORG")
+    
+    # If we have neither, that's an error
+    if not auth_token and not api_key:
+        print(f"[AUTH_DEBUG] ERROR: No authentication tokens found!")
+        print(f"[AUTH_DEBUG] RunPod should set AUTH_TOKEN_COMFY_ORG and/or API_KEY_COMFY_ORG")
         print(f"[AUTH_DEBUG] Available environment variables:")
         for key in sorted(os.environ.keys()):
             if any(term in key.upper() for term in ['AUTH', 'TOKEN', 'API', 'KEY', 'COMFY']):
@@ -368,8 +358,8 @@ def run_workflow(workflow):
                 print(f"[AUTH_DEBUG]   {key}: {value[:30]}..." if len(value) > 30 else f"[AUTH_DEBUG]   {key}: {value}")
     
     print(f"[AUTH_DEBUG] Final extra_data keys: {list(extra_data.keys())}")
-    if extra_data:
-        print(f"[AUTH_DEBUG] api_key_comfy_org length: {len(extra_data.get('api_key_comfy_org', ''))}")
+    for key, value in extra_data.items():
+        print(f"[AUTH_DEBUG] {key}: {value[:20]}...")
     
     prompt_payload = {"prompt": workflow, "client_id": str(uuid.uuid4())}
     if extra_data:
