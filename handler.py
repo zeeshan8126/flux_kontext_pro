@@ -8,6 +8,7 @@ import uuid
 import os
 import base64
 import copy
+import random
 
 # Verify critical dependencies at startup
 try:
@@ -110,11 +111,11 @@ def build_workflow(num_images):
         "class_type": "FluxKontextProImageNode",
         "inputs": {
             "prompt": "Default prompt",
-            "prompt_upsampling": False,
-            "guidance": 3.0,
-            "aspect_ratio": "16:9",
-            "steps": 50,
-            "seed": 1234,
+            "prompt_upsampling": True,  # Changed default to True
+            "guidance": 3.0,  # Will be overridden from input (required)
+            "aspect_ratio": "16:9",  # Will be overridden from input (required)
+            "steps": 100,  # Changed default to 100
+            "seed": random.randint(0, 2**32 - 1),  # Random seed by default
             "input_image": [bfl_input_node_id, 0]
         }
     }
@@ -483,13 +484,22 @@ def handler(job):
 
     api_node = final_workflow["30"]["inputs"]
     api_node["prompt"] = job_input.get('prompt', "Default prompt")
-    api_node["aspect_ratio"] = job_input.get('aspect_ratio', '16:9')
-    api_node["steps"] = job_input.get('steps', 50)
-    api_node["seed"] = job_input.get('seed', 1234)
     
-    guidance_value = job_input.get('guidance', 3.0)
-    api_node["guidance"] = guidance_value
-    api_node["prompt_upsampling"] = job_input.get('prompt_upsampling', False)
+    # guidance and aspect_ratio are now required from input only (no defaults)
+    if 'guidance' not in job_input:
+        return {"error": "guidance parameter is required in input"}
+    if 'aspect_ratio' not in job_input:
+        return {"error": "aspect_ratio parameter is required in input"}
+    
+    api_node["guidance"] = job_input['guidance']
+    api_node["aspect_ratio"] = job_input['aspect_ratio']
+    
+    # Updated defaults: steps=100, prompt_upsampling=True, random seed
+    api_node["steps"] = job_input.get('steps', 100)  # Changed default to 100
+    api_node["prompt_upsampling"] = job_input.get('prompt_upsampling', True)  # Changed default to True
+    
+    # Use random seed if not provided (instead of fixed default)
+    api_node["seed"] = job_input.get('seed', random.randint(0, 2**32 - 1))
 
     print(f"[HANDLER] Final workflow parameters:")
     print(f"  - Prompt: {api_node['prompt']}")
@@ -497,6 +507,7 @@ def handler(job):
     print(f"  - Guidance: {api_node['guidance']}")
     print(f"  - Steps: {api_node['steps']}")
     print(f"  - Prompt upsampling: {api_node['prompt_upsampling']}")
+    print(f"  - Seed: {api_node['seed']}")
     
     print("[HANDLER] Executing workflow...")
     return run_workflow(final_workflow)
