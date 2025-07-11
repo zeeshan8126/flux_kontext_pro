@@ -326,7 +326,7 @@ def run_workflow(workflow):
     if not validate_workflow(workflow):
         return {"error": "Workflow validation failed - check logs for details"}
     
-    # Comprehensive authentication debugging
+    # Include authentication credentials in extra_data for API nodes
     extra_data = {}
     
     # Get both possible authentication tokens from environment
@@ -337,15 +337,33 @@ def run_workflow(workflow):
     print(f"[AUTH_DEBUG] AUTH_TOKEN_COMFY_ORG: {'SET (' + auth_token[:20] + '...)' if auth_token else 'NOT SET OR EMPTY'}")
     print(f"[AUTH_DEBUG] API_KEY_COMFY_ORG: {'SET (' + api_key[:20] + '...)' if api_key else 'NOT SET OR EMPTY'}")
     
-    # The comfy_api_nodes system expects both "auth_token_comfy_org" and "api_key_comfy_org" in extra_data
-    # These get mapped to the node's auth_token and comfy_api_key parameters respectively
-    if auth_token:
-        extra_data["auth_token_comfy_org"] = auth_token
-        print(f"[AUTH_DEBUG] Set auth_token_comfy_org in extra_data")
+    # For ComfyUI API proxy endpoints (like BFL), we need to use ONLY the ComfyUI platform API key
+    # The ApiClient prioritizes auth_token (Bearer) over comfy_api_key (X-API-KEY)
+    # But ComfyUI API expects X-API-KEY, so we should only set comfy_api_key
     
+    # Use the ComfyUI platform API key (starts with "comfyui-") if available
+    if api_key and api_key.startswith("comfyui-"):
+        # Use direct parameter name that BFL nodes expect
+        extra_data["comfy_api_key"] = api_key  # Maps to X-API-KEY header
+        print(f"[AUTH_DEBUG] Using ComfyUI platform API key (comfy_api_key)")
+    elif api_key:
+        extra_data["comfy_api_key"] = api_key  # Use any API key available
+        print(f"[AUTH_DEBUG] Using API_KEY_COMFY_ORG as comfy_api_key")
+    elif auth_token:
+        # Only fallback to auth_token if no proper API key is available
+        extra_data["comfy_api_key"] = auth_token
+        print(f"[AUTH_DEBUG] Fallback: Using AUTH_TOKEN_COMFY_ORG as comfy_api_key")
+    
+    # DO NOT set 'auth_token' key to avoid Bearer authentication
+    # The ApiClient will use Bearer auth if auth_token is set, but we need X-API-KEY
+    
+    # Additional debugging: try both key naming conventions
     if api_key:
-        extra_data["api_key_comfy_org"] = api_key  
-        print(f"[AUTH_DEBUG] Set api_key_comfy_org in extra_data")
+        # Also try the environment variable mapping style
+        extra_data["api_key_comfy_org"] = api_key
+        print(f"[AUTH_DEBUG] Also set api_key_comfy_org for compatibility")
+    
+    print(f"[AUTH_DEBUG] Strategy: Only using comfy_api_key to force X-API-KEY authentication")
     
     # If we have neither, that's an error
     if not auth_token and not api_key:
@@ -357,9 +375,8 @@ def run_workflow(workflow):
                 value = os.environ[key]
                 print(f"[AUTH_DEBUG]   {key}: {value[:30]}..." if len(value) > 30 else f"[AUTH_DEBUG]   {key}: {value}")
     
-    print(f"[AUTH_DEBUG] Final extra_data keys: {list(extra_data.keys())}")
-    for key, value in extra_data.items():
-        print(f"[AUTH_DEBUG] {key}: {value[:20]}...")
+    print(f"[AUTH_DEBUG] Final extra_data: {extra_data}")
+    print(f"[AUTH_DEBUG] This will use X-API-KEY header (not Bearer) for ComfyUI API")
     
     prompt_payload = {"prompt": workflow, "client_id": str(uuid.uuid4())}
     if extra_data:
