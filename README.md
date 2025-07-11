@@ -29,11 +29,19 @@ To use the deployed endpoint, you need to send a `POST` request to its `/runsync
 *   **Headers:**
     *   `Content-Type: application/json`
     *   `Authorization: Bearer YOUR_RUNPOD_API_KEY`
+
+### Mode Selection
+
+The API now supports both **Flux.1 Kontext Pro** and **Flux.1 Kontext Max** models through the `mode` parameter:
+
+- **`mode: "pro"`** (default) - Uses FluxKontextProImageNode for fast, iterative editing
+- **`mode: "max"`** - Uses FluxKontextMaxImageNode for maximum performance with enhanced typography and prompt precision
 *   **Body:** A JSON object with the following structure:
     *   `prompt` (string, required): Your detailed editing instruction.
     *   `images` (array, required): An array containing 1 to 5 image objects.
         *   `name` (string): A unique filename for the image.
         *   `image` (string): The Base64 encoded data for the image.
+    *   `mode` (string, optional): The Flux Kontext model to use. Can be "pro" or "max". Defaults to "pro".
     *   `aspect_ratio` (string, optional): The desired output aspect ratio (e.g., "1:1", "16:9"). Defaults to "1:1".
     *   `guidance` (number, optional): A value to control prompt upsampling. Values > 7.5 will enable it. Defaults to a value that keeps it disabled.
     *   `steps` (integer, optional): The number of sampling steps. Defaults to 50.
@@ -61,6 +69,7 @@ The API will return a JSON object containing the results. The `data` field will 
 {
   "input": {
     "prompt": "Place the person into the new background scene",
+    "mode": "pro",
     "aspect_ratio": "16:9",
     "guidance": 8.0,
     "images": [
@@ -77,12 +86,13 @@ The API will return a JSON object containing the results. The `data` field will 
 }
 ```
 
-### Example: 5-Image Payload
+### Example: 5-Image Payload with Max Mode
 
 ```json
 {
   "input": {
     "prompt": "Combine all five elements into a single cohesive scene",
+    "mode": "max",
     "aspect_ratio": "1:1",
     "guidance": 7.0,
     "images": [

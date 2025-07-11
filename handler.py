@@ -49,9 +49,18 @@ SERVER_ADDRESS = "127.0.0.1:8188"
 comfyui_started = False
 
 # -------------------------- Dynamic Workflow Builder -------------------------- #
-def build_workflow(num_images):
-    """Dynamically builds a workflow to chain-stitch a variable number of images."""
-    print(f"[WORKFLOW] Building workflow for {num_images} images")
+def build_workflow(num_images, mode="pro"):
+    """Dynamically builds a workflow to chain-stitch a variable number of images with mode selection."""
+    print(f"[WORKFLOW] Building workflow for {num_images} images with mode: {mode}")
+    
+    # Determine the appropriate node class based on mode
+    if mode.lower() == "pro":
+        flux_node_class = "FluxKontextProImageNode"
+    elif mode.lower() == "max":
+        flux_node_class = "FluxKontextMaxImageNode"
+    else:
+        print(f"[WORKFLOW] WARNING: Unknown mode '{mode}', defaulting to 'pro'")
+        flux_node_class = "FluxKontextProImageNode"
     
     workflow = {}
     load_node_ids = []
@@ -102,13 +111,13 @@ def build_workflow(num_images):
             }
             print(f"[WORKFLOW] Added chained ImageStitch node {stitch_node_id}")
     
-    # Determine input for FluxKontextProImageNode
+    # Determine input for Flux Kontext node
     bfl_input_node_id = load_node_ids[0] if num_images == 1 else last_stitch_node_id
     print(f"[WORKFLOW] BFL input will come from node {bfl_input_node_id}")
     
-    # Build FluxKontextProImageNode
+    # Build Flux Kontext node (Pro or Max based on mode)
     bfl_node = {
-        "class_type": "FluxKontextProImageNode",
+        "class_type": flux_node_class,
         "inputs": {
             "prompt": "Default prompt",
             "prompt_upsampling": True,  # Changed default to True
@@ -120,7 +129,7 @@ def build_workflow(num_images):
         }
     }
     workflow["30"] = bfl_node
-    print(f"[WORKFLOW] Added FluxKontextProImageNode")
+    print(f"[WORKFLOW] Added {flux_node_class} node")
     
     # Build SaveImage node
     workflow["31"] = {
@@ -137,7 +146,7 @@ def build_workflow(num_images):
     print(f"[WORKFLOW] - Total nodes: {len(workflow)}")
     print(f"[WORKFLOW] - LoadImage nodes: {len(load_node_ids)}")
     print(f"[WORKFLOW] - ImageStitch nodes: {max(0, num_images - 1)}")
-    print(f"[WORKFLOW] - API nodes: 1 (FluxKontextProImageNode)")
+    print(f"[WORKFLOW] - API nodes: 1 ({flux_node_class})")
     print(f"[WORKFLOW] - SaveImage nodes: 1")
     
     return workflow
@@ -147,8 +156,9 @@ def validate_workflow(workflow):
     """Validate workflow structure before sending to ComfyUI"""
     print("[VALIDATION] Checking workflow structure...")
     
-    # Check for required nodes
-    required_classes = ["LoadImage", "FluxKontextProImageNode", "SaveImage"]
+    # Check for required nodes (either Pro or Max node is acceptable)
+    required_classes = ["LoadImage", "SaveImage"]
+    flux_node_classes = ["FluxKontextProImageNode", "FluxKontextMaxImageNode"]
     found_classes = set()
     
     for node_id, node_data in workflow.items():
@@ -174,6 +184,12 @@ def validate_workflow(workflow):
     missing_classes = set(required_classes) - found_classes
     if missing_classes:
         print(f"[VALIDATION] ERROR: Missing required node classes: {missing_classes}")
+        return False
+    
+    # Check if we have at least one Flux Kontext node
+    flux_node_found = any(cls in found_classes for cls in flux_node_classes)
+    if not flux_node_found:
+        print(f"[VALIDATION] ERROR: Missing Flux Kontext node. Expected one of: {flux_node_classes}")
         return False
     
     print(f"[VALIDATION] Found node classes: {sorted(found_classes)}")
@@ -277,7 +293,7 @@ def check_server_health():
                 print(f"[HEALTH] Available node classes: {len(object_info)} nodes")
                 
                 # Check for our required nodes
-                required_nodes = ["LoadImage", "FluxKontextProImageNode", "SaveImage", "ImageStitch"]
+                required_nodes = ["LoadImage", "FluxKontextProImageNode", "FluxKontextMaxImageNode", "SaveImage", "ImageStitch"]
                 missing_nodes = []
                 for node in required_nodes:
                     if node not in object_info:
@@ -476,8 +492,20 @@ def handler(job):
     print("[HANDLER] Preparing input images...")
     prepare_inputs(images)
     
+    # Extract mode from job input (default to "pro" if not specified)
+    mode = job_input.get('mode', 'pro')
+    print(f"[HANDLER] Using mode: {mode}")
+    
+    # Validate mode parameter
+    valid_modes = ['pro', 'max']
+    if mode.lower() not in valid_modes:
+        print(f"[HANDLER] ERROR: Invalid mode '{mode}'. Valid modes are: {valid_modes}")
+        return {"error": f"Invalid mode '{mode}'. Valid modes are: {valid_modes}"}
+    
+    mode = mode.lower()  # Normalize to lowercase
+    
     print("[HANDLER] Building workflow...")
-    final_workflow = build_workflow(num_images)
+    final_workflow = build_workflow(num_images, mode)
 
     for i in range(num_images):
         final_workflow[str(10 + i)]["inputs"]["image"] = images[i]["name"]
